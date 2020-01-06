@@ -1,0 +1,3 @@
+No new serial port detected.
+esptool.py v2.8
+Serial port COM7
