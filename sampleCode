@@ -40,7 +40,7 @@ void handleRoot(){
     //Serial.println(str_value);
     if(str_value != ""){
       str_value.replace(".", ",");
-      Serial.print("Saber per 1m: ");
+      //Serial.print("Saber per 1m: ");
       Serial.print(str_value);
       Serial.println();
       server.send(200,"text/plain", str_value); 

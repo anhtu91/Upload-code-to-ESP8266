@@ -24,7 +24,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, Registry, Mask, ShellApi, StrUtils, FileCtrl, IdIcmpClient;
+  Dialogs, StdCtrls, Registry, Mask, ShellApi, StrUtils, FileCtrl, ExtCtrls, WinInet;
 
 type
   TuploadForm = class(TForm)
@@ -43,6 +43,10 @@ type
     meditSubnet: TMaskEdit;
     lbPort: TLabel;
     meditPort: TMaskEdit;
+    Panel3: TPanel;
+    Image2: TImage;
+    lbExplain: TLabel;
+    btnScanPort: TButton;
     procedure SearchComPort;
     procedure FormCreate(Sender: TObject);
     procedure ButtonUploadClick(Sender: TObject);
@@ -51,6 +55,8 @@ type
     function CheckUploadCodeSuccessful: Integer;
     function CheckInputAddressEmpty(InputParameter: string): Integer;
     function ValidateIP(IP4: string): Integer;
+    function ShellExecute_AndWait(FileName: string; Params: string): bool;
+    procedure btnScanPortClick(Sender: TObject);
   private
     { Private-Deklarationen }
   public
@@ -89,7 +95,6 @@ begin
   finally
     reg.Free;
   end;
-
 end;
 
 //-------------------------------------------------------------------------------------------------------------
@@ -115,8 +120,9 @@ var
   subnet: string;
   port: string;
   comPort: string;
+  flags: Windows.DWORD;
 begin
-  //Get input info 
+  //Get input info
    wifiSSID := edtWifiSSID.Text;
    wifiPassword := edtWifiPassword.Text;
    ipAddress := meditIPAddress.Text;
@@ -124,44 +130,62 @@ begin
    gateWay := meditGateWay.Text;
    subnet := meditSubnet.Text;
    comPort := cbComPort.Text;
-   
-   //Check if string input empty
-   if (wifiSSID = '') or (wifiPassword = '') or (ipAddress = '') or (gateWay = '') or (subnet = '') or (port = '') or (comPort = '') then
-   begin
-       Application.MessageBox('Input parameters empty!', 'Error', MB_ICONERROR);
-   end
-   else
-   begin
-     if(CheckInputAddressEmpty(ipAddress) <> 0) then
+
+   flags := 0;
+
+   if(WinInet.InternetGetConnectedState(@flags, 0)) then  //If has internet connection
      begin
-        if (CheckInputAddressEmpty(gateWay) <> 0)then
-        begin
-             if (CheckInputAddressEmpty(subnet) <> 0) then
+         //Check if string input empty
+         if (wifiSSID = '') or (wifiPassword = '') or (ipAddress = '') or (gateWay = '') or (subnet = '') or (port = '') or (comPort = '') then
+           begin
+               Application.MessageBox('Input parameters empty!', 'Error', MB_ICONERROR);
+           end
+         else
+           begin
+             if(CheckInputAddressEmpty(ipAddress) <> 0) then
              begin
-                   CreateSourceCode(wifiSSID, wifiPassword, ipAddress, port, gateWay, subnet) ;
-                   CreateBatchFile(comPort);
-                   ShellExecute(Application.Handle, 'open', PChar(GetCurrentDir+'\batchFile.cmd'), nil, nil, SW_NORMAL);
+                if (CheckInputAddressEmpty(gateWay) <> 0)then
+                begin
+                     if (CheckInputAddressEmpty(subnet) <> 0) then
+                     begin
+                           CreateSourceCode(wifiSSID, wifiPassword, ipAddress, port, gateWay, subnet) ;
+                           CreateBatchFile(comPort);
+                           if ShellExecute_AndWait(PChar(GetCurrentDir+'\batchFile.cmd'), '') then
+                           begin
+                              if CheckUploadCodeSuccessful = 0 then
+                              begin
+                                ShowMessage('Upload code successful');
+                              end
+                              else if CheckUploadCodeSuccessful = 1 then
+                              begin
+                                ShowMessage('COM Port is busy!');
+                              end
+                              else
+                              begin
+                                ShowMessage('Error while uploading!');
+                              end;
+                           end
+                           else
+                           begin
+                              ShowMessage('Error while running batch file!');
+                           end;
+                     end
+                     else
+                         Application.MessageBox('Not correct Subnet!', 'Error', MB_ICONERROR);
+                end
+                else
+                    Application.MessageBox('Not correct Gateway!', 'Error', MB_ICONERROR);
              end
              else
-                 Application.MessageBox('Not correct Subnet!', 'Error', MB_ICONERROR);
-        end
-        else
-            Application.MessageBox('Not correct Gateway!', 'Error', MB_ICONERROR);
-     end
-     else
-        Application.MessageBox('Not correct IP Address!', 'Error', MB_ICONERROR);
-   end;
+                Application.MessageBox('Not correct IP Address!', 'Error', MB_ICONERROR);
+           end;
 
-   {*if CheckUploadCodeSuccessful = 0 then
-     begin
-       ShowMessage('Upload code successful!');
      end
    else
      begin
-       ShowMessage('Error!!!');
+         ShowMessage('No internet connection!');
      end;
-   *}
-   //ShellExecute(Application.Handle, 'explore', 'C:\Windows', nil, nil, SW_SHOWNORMAL);
+
 end;
 
 //-------------------------------------------------------------------------------------------------------------
@@ -328,35 +352,99 @@ end;
 //-------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------
 function TuploadForm.CheckUploadCodeSuccessful: Integer;
+// This function checks output.txt file in folder \cli, if code for microcontroller is installed correctly
+// Result: 0, installed correctly,  1, installed incorrectly COM port is busy , 2 installed incorrectly
 var
-  idIcmpClient: TIdIcmpClient;
-  port: string;
+  outputFile: TextFile;
+  line: string;
+  checkUploadCorrect: Integer;
 begin
-  {*idIcmpClient := TIdIcmpClient.Create(nil);
-  idIcmpClient.Host := meditIPAddress.Text;
-
-  port := meditPort.Text;
-  port := StringReplace(port, ' ', '', [rfReplaceAll]);
-  idIcmpClient.Port := StrToInt(port);
-
   try
-    idIcmpClient.Ping;
+     AssignFile(outputFile, GetCurrentDir+'\cli\output.txt');
+     Reset(outputFile);
+     checkUploadCorrect := 0;
+
+     while not Eof(outputFile) do
+       begin
+         ReadLn(outputFile, line);
+         if AnsiContainsStr(line,'Connecting....') then
+            begin
+              checkUploadCorrect := checkUploadCorrect + 1;
+            end
+         else if AnsiContainsStr(line,'100 %') then
+           begin
+              checkUploadCorrect := checkUploadCorrect + 1;
+           end
+         else if AnsiContainsStr(line,'Hash of data verified.') then
+           begin
+              checkUploadCorrect := checkUploadCorrect + 1;
+           end
+         else if AnsiContainsStr(line,'........_____....._____....._____') then
+           begin
+              checkUploadCorrect := checkUploadCorrect + 1; // found error
+           end;
+       end;
+
+     if checkUploadCorrect = 3 then
+       begin
+          result := 0; //correct
+       end
+     else if checkUploadCorrect = 0 then
+       begin
+          result := 1; //incorrect COM port is busy
+       end
+     else if checkUploadCorrect = 1 then
+       begin
+          result := 2; //incorrect 
+       end;
+
+     CloseFile(outputFile);
   except
-    result:=-1;
-    idIcmpClient.Free;
+     result := 1; //incorrect
   end;
-
-  if idicmpclient.ReplyStatus.ReplyStatusType = rsEcho then
-    //result:=idIcmpClient.ReplyStatus.MsRoundTripTime
-    begin
-       result := 0;
-    end
-  else
-    begin
-      result:=-1;
-    end;
-
-  idIcmpClient.Free; *}
 end;
 
+//-------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------
+procedure TuploadForm.btnScanPortClick(Sender: TObject);
+// This procedure re-scan to search new COM Port
+begin
+   cbComPort.Clear;
+   SearchComPort;
+end;
+
+//-------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------
+function TuploadForm.ShellExecute_AndWait(FileName: string; Params: string): bool;
+var
+  exInfo: TShellExecuteInfo;
+  Ph: DWORD;
+begin
+
+  FillChar(exInfo, SizeOf(exInfo), 0);
+  with exInfo do
+    begin
+      cbSize := SizeOf(exInfo);
+      fMask := SEE_MASK_NOCLOSEPROCESS or SEE_MASK_FLAG_DDEWAIT;
+      Wnd := GetActiveWindow();
+      exInfo.lpVerb := 'open';
+      exInfo.lpParameters := PChar(Params);
+      lpFile := PChar(FileName);
+      nShow := SW_HIDE;
+    end;
+  if ShellExecuteEx(@exInfo) then
+    Ph := exInfo.hProcess
+  else
+    begin
+      ShowMessage(SysErrorMessage(GetLastError));
+      Result := true;
+      exit;
+    end;
+  while WaitForSingleObject(exInfo.hProcess, 50) <> WAIT_OBJECT_0 do
+    Application.ProcessMessages;
+  CloseHandle(Ph);
+
+  Result := true;
+
+end;
 end.

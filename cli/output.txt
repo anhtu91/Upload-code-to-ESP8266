@@ -1,3 +1,22 @@
 No new serial port detected.
 esptool.py v2.8
 Serial port COM7
+Connecting....
+Chip is ESP8266EX
+Features: WiFi
+Crystal is 26MHz
+MAC: 84:f3:eb:e0:37:69
+Uploading stub...
+Running stub...
+Stub running...
+Changing baud rate to 460800
+Changed.
+Configuring flash size...
+Auto-detected Flash size: 16MB
+Flash params set to 0x0290
+Compressed 298256 bytes to 215699...
+Writing at 0x00000000... (7 %)Writing at 0x00004000... (14 %)Writing at 0x00008000... (21 %)Writing at 0x0000c000... (28 %)Writing at 0x00010000... (35 %)Writing at 0x00014000... (42 %)Writing at 0x00018000... (50 %)Writing at 0x0001c000... (57 %)Writing at 0x00020000... (64 %)Writing at 0x00024000... (71 %)Writing at 0x00028000... (78 %)Writing at 0x0002c000... (85 %)Writing at 0x00030000... (92 %)Writing at 0x00034000... (100 %)Wrote 298256 bytes (215699 compressed) at 0x00000000 in 5.2 seconds (effective 459.3 kbit/s)...
+Hash of data verified.
+
+Leaving...
+Hard resetting via RTS pin...

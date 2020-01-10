@@ -3,11 +3,11 @@
 #include  <WiFiClient.h>
 #include  <ESP8266WebServer.h>
 
-const char* ssid = "aaabbb"; //Wifi SSID
-const char* password = "11111111"; //Wifi Password
+const char* ssid = "aaaa"; //Wifi SSID
+const char* password = "bbbb"; //Wifi Password
 
-IPAddress ip(192,168,11,98); //Set static IP for ESP8266
-IPAddress gateway(192,168,11,241); //Router IP Address 
+IPAddress ip(192,168,11,241); //Set static IP for ESP8266
+IPAddress gateway(192,168,11,1); //Router IP Address 
 IPAddress subnet(255,255,255,0); //Subnet router
 
 ESP8266WebServer server(8080); //Port to connect ESP8266
@@ -40,7 +40,7 @@ void handleRoot(){
     //Serial.println(str_value);
     if(str_value != ""){
       str_value.replace(".", ",");
-      Serial.print("Saber per 1m: ");
+      //Serial.print("Saber per 1m: ");
       Serial.print(str_value);
       Serial.println();
       server.send(200,"text/plain", str_value); 
